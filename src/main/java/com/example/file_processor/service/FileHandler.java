@@ -1,13 +1,18 @@
 package com.example.file_processor.service;
 
 import com.example.file_processor.entity.File;
+import com.example.file_processor.repository.FileRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Instant;
-
 @Service
 public class FileHandler {
+
+    private final FileRepository fileRepository;
+
+    public FileHandler(FileRepository fileRepository) {
+        this.fileRepository = fileRepository;
+    }
 
     public File handleFileUpload(MultipartFile file ) {
         File uploadedFile = new File();
@@ -15,7 +20,7 @@ public class FileHandler {
         uploadedFile.setFileSize(file.getSize());
         uploadedFile.setFileType(file.getContentType());
         uploadedFile.setStatus("SUCCESS");
-        uploadedFile.setCreatedAt(Instant.now().toString());
+        fileRepository.save(uploadedFile);
 
         return uploadedFile;
     }

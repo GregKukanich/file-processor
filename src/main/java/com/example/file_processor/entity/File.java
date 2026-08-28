@@ -6,6 +6,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Getter
@@ -14,11 +15,13 @@ public class File {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long id;
-    public long fileSize;
+    private Long id;
+    public Long fileSize;
     public String fileType;
     public String s3Key;
     public String fileName;
+
+    @CreationTimestamp
     public String createdAt;
     public String status;
 
