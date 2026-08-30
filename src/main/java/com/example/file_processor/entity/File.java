@@ -20,10 +20,21 @@ public class File {
     public String fileType;
     public String s3Key;
     public String fileName;
-
     @CreationTimestamp
     public String createdAt;
     public String status;
 
+    //summary fields
+    public Integer totalRows;
+    public Integer validRows;
+    public Integer invalidRows;
+
+    public Integer purchaseCount;
+    public Double totalPurchaseAmount;
+
+    public Integer refundCount;
+    public Double totalRefundAmount;
+
+    public Double netAmount;
 
 }

@@ -1,14 +1,15 @@
 package com.example.file_processor.controller;
 
+import com.example.file_processor.dto.FileStatusResponse;
 import com.example.file_processor.dto.FileUploadResponse;
 import com.example.file_processor.entity.File;
 import com.example.file_processor.service.FileHandler;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/file")
@@ -21,7 +22,7 @@ public class FileController {
     }
 
     @PostMapping
-    public ResponseEntity<FileUploadResponse> upload(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<FileUploadResponse> upload(@RequestParam("file") MultipartFile file) throws IOException {
         if (!validate(file)) {
             return ResponseEntity.badRequest().body(new FileUploadResponse("Invalid file"));
         }
@@ -31,5 +32,18 @@ public class FileController {
 
     private Boolean validate(MultipartFile file) {
         return !file.isEmpty();
+    }
+
+    @GetMapping
+    public ResponseEntity<FileStatusResponse> getFileStatus(@RequestParam("id") Long id) {
+        if (id == null) {
+            return ResponseEntity.badRequest().body(new FileStatusResponse("Invalid id"));
+        }
+
+        Optional<File> file = fileHandler.getFileStatus(id);
+        if (file.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(new FileStatusResponse(file.get()));
     }
 }
