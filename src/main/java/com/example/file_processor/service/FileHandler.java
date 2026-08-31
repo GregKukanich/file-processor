@@ -9,7 +9,9 @@ import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -19,9 +21,13 @@ import java.util.Optional;
 public class FileHandler {
 
     private final FileRepository fileRepository;
+    private final S3Service s3Service;
+    private final SqsService sqsService;
 
-    public FileHandler(FileRepository fileRepository) {
+    public FileHandler(FileRepository fileRepository, S3Service s3Service, SqsService sqsService) {
         this.fileRepository = fileRepository;
+        this.s3Service = s3Service;
+        this.sqsService = sqsService;
     }
 
     public File handleFileUpload(MultipartFile file ) throws IOException {
@@ -29,7 +35,7 @@ public class FileHandler {
         uploadedFile.setFileName(file.getOriginalFilename());
         uploadedFile.setFileSize(file.getSize());
         uploadedFile.setFileType(file.getContentType());
-        uploadedFile.setStatus("COMPLETED");
+        uploadedFile.setStatus("PENDING");
 
         CsvProcessingSummary summary = parseFile(file);
         uploadedFile.setTotalRows(summary.totalRows());
@@ -44,6 +50,10 @@ public class FileHandler {
 
         uploadedFile.setNetAmount(summary.netAmount());
 
+        String key = s3Service.uploadFile(file);
+        uploadedFile.setS3Key(key);
+
+        sqsService.sendMessage(uploadedFile.getS3Key());
         fileRepository.save(uploadedFile);
 
         return uploadedFile;
