@@ -33,7 +33,7 @@ public class S3Service {
         return key;
     }
 
-    public InputStream downloadFile(String s3Key) throws IOException {
+    public InputStream downloadFile(String s3Key) {
         return s3Client.getObject(GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(s3Key)

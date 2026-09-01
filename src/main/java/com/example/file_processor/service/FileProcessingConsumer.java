@@ -25,7 +25,7 @@ public class FileProcessingConsumer {
             return;
         }
 
-        Message message = messages.get(0);
+        Message message = messages.getFirst();
         try {
             fileHandler.handleFileParsing(message.body(), message.receiptHandle());
         } catch (IOException e) {
