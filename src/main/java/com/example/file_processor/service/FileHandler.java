@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -37,29 +38,39 @@ public class FileHandler {
         uploadedFile.setFileType(file.getContentType());
         uploadedFile.setStatus("PENDING");
 
-        CsvProcessingSummary summary = parseFile(file);
-        uploadedFile.setTotalRows(summary.totalRows());
-        uploadedFile.setValidRows(summary.validRows());
-        uploadedFile.setInvalidRows(summary.invalidRows());
-
-        uploadedFile.setPurchaseCount(summary.purchaseCount());
-        uploadedFile.setTotalPurchaseAmount(summary.totalPurchaseAmount());
-
-        uploadedFile.setRefundCount(summary.refundCount());
-        uploadedFile.setTotalRefundAmount(summary.totalRefundAmount());
-
-        uploadedFile.setNetAmount(summary.netAmount());
-
         String key = s3Service.uploadFile(file);
         uploadedFile.setS3Key(key);
 
-        sqsService.sendMessage(uploadedFile.getS3Key());
         fileRepository.save(uploadedFile);
+        sqsService.sendMessage(uploadedFile.getId().toString());
 
         return uploadedFile;
     }
 
-    public CsvProcessingSummary parseFile(MultipartFile file) throws IOException {
+    public void handleFileParsing(String fileId, String receiptHandle) throws IOException {
+        Optional<File> fileOptional = fileRepository.findById(Long.parseLong(fileId));
+        if (fileOptional.isEmpty()) {
+            return;
+        }
+        File file = fileOptional.get();
+        InputStream inputStream = s3Service.downloadFile(file.getS3Key());
+
+        CsvProcessingSummary summary = parseFile(inputStream);
+        file.setTotalRows(summary.totalRows());
+        file.setValidRows(summary.validRows());
+        file.setInvalidRows(summary.invalidRows());
+        file.setPurchaseCount(summary.purchaseCount());
+        file.setTotalPurchaseAmount(summary.totalPurchaseAmount());
+        file.setRefundCount(summary.refundCount());
+        file.setTotalRefundAmount(summary.totalRefundAmount());
+        file.setNetAmount(summary.netAmount());
+        file.setStatus("COMPLETED");
+
+        fileRepository.save(file);
+        sqsService.deleteMessage(receiptHandle);
+    }
+
+    public CsvProcessingSummary parseFile(InputStream file) throws IOException {
         CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setHeader()
                 .setSkipHeaderRecord(true)
@@ -75,7 +86,7 @@ public class FileHandler {
         double netAmount = 0.0;
 
         try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8));
+                new InputStreamReader(file, StandardCharsets.UTF_8));
              CSVParser csvParser = CSVParser.parse(br, format)) {
 
             for (CSVRecord record : csvParser) {
