@@ -6,28 +6,17 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
-import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 import java.util.List;
 
 @Service
-public class SqsService {
+public class SqsConsumerService {
     private final SqsClient sqsClient;
     private final String queueUrl;
 
-    public SqsService(SqsClient sqsClient, @Value("${aws.sqs.queue-url}") String queueUrl) {
+    public SqsConsumerService(SqsClient sqsClient, @Value("${aws.sqs.queue-url}") String queueUrl) {
         this.sqsClient = sqsClient;
         this.queueUrl = queueUrl;
-    }
-
-    public void sendMessage(String messageBody) {
-        SendMessageRequest sendMessageRequest = SendMessageRequest
-                .builder()
-                .queueUrl(queueUrl)
-                .messageBody(messageBody)
-                .build();
-
-        sqsClient.sendMessage(sendMessageRequest);
     }
 
     public void deleteMessage(String receiptHandle) {
@@ -48,3 +37,4 @@ public class SqsService {
         return sqsClient.receiveMessage(receiveMessageRequest).messages();
     }
 }
+

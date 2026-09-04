@@ -10,24 +10,24 @@ import java.util.List;
 @Service
 public class FileProcessingConsumer {
 
-    private final SqsService sqsService;
-    private final FileHandler fileHandler;
+    private final SqsConsumerService sqsConsumerService;
+    private final FileHandlerWorker fileHandlerWorker;
 
-    public FileProcessingConsumer(SqsService sqsService, FileHandler fileHandler) {
-        this.sqsService = sqsService;
-        this.fileHandler = fileHandler;
+    public FileProcessingConsumer(SqsConsumerService sqsConsumerService, FileHandlerWorker fileHandlerWorker) {
+        this.sqsConsumerService = sqsConsumerService;
+        this.fileHandlerWorker = fileHandlerWorker;
     }
 
     @Scheduled(fixedRate = 5000)
     public void consumeMessages() {
-        List<Message> messages = sqsService.receiveMessages();
+        List<Message> messages = sqsConsumerService.receiveMessages();
         if (messages.isEmpty()) {
             return;
         }
 
         Message message = messages.getFirst();
         try {
-            fileHandler.handleFileParsing(message.body(), message.receiptHandle());
+            fileHandlerWorker.handleFileParsing(message.body(), message.receiptHandle());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

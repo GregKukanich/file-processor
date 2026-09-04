@@ -7,7 +7,6 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -19,33 +18,18 @@ import java.time.format.DateTimeParseException;
 import java.util.Optional;
 
 @Service
-public class FileHandler {
+public class FileHandlerWorker {
 
     private final FileRepository fileRepository;
-    private final S3Service s3Service;
-    private final SqsService sqsService;
+    private final S3ServiceWorker s3ServiceWorker;
+    private final SqsConsumerService sqsConsumerService;
 
-    public FileHandler(FileRepository fileRepository, S3Service s3Service, SqsService sqsService) {
+    public FileHandlerWorker(FileRepository fileRepository, S3ServiceWorker s3ServiceWorker, SqsConsumerService sqsConsumerService) {
         this.fileRepository = fileRepository;
-        this.s3Service = s3Service;
-        this.sqsService = sqsService;
+        this.s3ServiceWorker = s3ServiceWorker;
+        this.sqsConsumerService = sqsConsumerService;
     }
 
-    public File handleFileUpload(MultipartFile file ) throws IOException {
-        File uploadedFile = new File();
-        uploadedFile.setFileName(file.getOriginalFilename());
-        uploadedFile.setFileSize(file.getSize());
-        uploadedFile.setFileType(file.getContentType());
-        uploadedFile.setStatus("PENDING");
-
-        String key = s3Service.uploadFile(file);
-        uploadedFile.setS3Key(key);
-
-        fileRepository.save(uploadedFile);
-        sqsService.sendMessage(uploadedFile.getId().toString());
-
-        return uploadedFile;
-    }
 
     public void handleFileParsing(String fileId, String receiptHandle) throws IOException {
         Optional<File> fileOptional = fileRepository.findById(Long.parseLong(fileId));
@@ -53,7 +37,7 @@ public class FileHandler {
             return;
         }
         File file = fileOptional.get();
-        InputStream inputStream = s3Service.downloadFile(file.getS3Key());
+        InputStream inputStream = s3ServiceWorker.downloadFile(file.getS3Key());
 
         CsvProcessingSummary summary = parseFile(inputStream);
         file.setTotalRows(summary.totalRows());
@@ -67,7 +51,7 @@ public class FileHandler {
         file.setStatus("COMPLETED");
 
         fileRepository.save(file);
-        sqsService.deleteMessage(receiptHandle);
+        sqsConsumerService.deleteMessage(receiptHandle);
     }
 
     public CsvProcessingSummary parseFile(InputStream file) throws IOException {
@@ -149,8 +133,4 @@ public class FileHandler {
         return true;
     }
 
-
-    public Optional<File> getFileStatus(Long id) {
-        return fileRepository.findById(id);
-    }
 }
