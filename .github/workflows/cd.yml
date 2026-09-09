@@ -1,0 +1,73 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REGISTRY: 942440204471.dkr.ecr.us-east-2.amazonaws.com
+  ECS_CLUSTER: file-processor-cluster
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - module: api
+            ecr_repo: file-processor/api
+            task_family: file-processor-api
+            container_name: api
+            service: file-processor-api-service
+          - module: worker
+            ecr_repo: file-processor/worker
+            task_family: file-processor-worker
+            container_name: Main
+            service: file-processor-worker-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          IMAGE_URI: ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:${{ github.sha }}
+        run: |
+          docker build -f ${{ matrix.module }}/Dockerfile -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          docker tag "$IMAGE_URI" "${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:latest"
+          docker push "${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:latest"
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ matrix.task_family }} \
+            --query taskDefinition > task-definition.json
+
+      - name: Render new task definition with updated image
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ matrix.container_name }}
+          image: ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:${{ github.sha }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ matrix.service }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
